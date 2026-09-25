@@ -1,6 +1,6 @@
 # Tesla Financial Report RAG Assistant
 
-A small, local Streamlit RAG application for asking grounded questions about one Tesla financial report. It loads the PDF with LangChain's `PyPDFLoader`, splits it with `RecursiveCharacterTextSplitter`, embeds chunks locally with `sentence-transformers/all-MiniLM-L6-v2`, expands each question into three report-focused search queries, stores chunks in ChromaDB, and sends the top five retrieved chunks to OpenAI GPT-5.4 Mini.
+A small, local FastAPI + HTML RAG application for asking grounded questions about one Tesla financial report. It loads the PDF with LangChain's `PyPDFLoader`, splits it with `RecursiveCharacterTextSplitter`, embeds chunks locally with `sentence-transformers/all-MiniLM-L6-v2`, expands each question into three report-focused search queries, stores chunks in ChromaDB, and sends the top five retrieved chunks to OpenAI GPT-5.4 Mini.
 
 ## Prerequisites
 
@@ -40,15 +40,16 @@ The supplied report can be copied there as `tsla-20231231-gen.pdf`, or set `TESL
 ## Run
 
 ```powershell
-streamlit run app.py
+uvicorn app:app --reload
 ```
 
-The browser UI shows the original question, all three generated expansions, the five retrieved source chunks, source filename, page numbers, generated answer, and session-only question history in the sidebar.
+Open `http://localhost:8000`. The browser UI shows the original question, all three generated expansions, the five retrieved source chunks, source filename, page numbers, generated answer, and session-only question history in the sidebar.
 
 ## How it works
 
 ```text
-PDF -> PyPDFLoader -> RecursiveCharacterTextSplitter
+HTML -> FastAPI -> RAG pipeline
+  -> PDF -> PyPDFLoader -> RecursiveCharacterTextSplitter
     -> local MiniLM embeddings -> ChromaDB
     -> 3 query expansions -> top 5 deduplicated results -> GPT-5.4 Mini -> answer + sources
 ```
@@ -68,17 +69,19 @@ The prompt instructs the model to use only retrieved report context and to say w
 ## Troubleshooting
 
 - **PDF not found:** confirm the file is at `data/tesla_financial_report.pdf`, or set `TESLA_PDF_PATH` in `.env`.
-- **Missing API key:** set `OPENAI_API_KEY` in `.env` and restart Streamlit.
-- **Stale index after replacing the PDF:** stop Streamlit, delete `chroma_db/`, then start it again.
+- **Missing API key:** set `OPENAI_API_KEY` in `.env` and restart Uvicorn.
+- **Stale index after replacing the PDF:** stop Uvicorn, delete `chroma_db/`, then start it again.
 - **Slow first startup:** downloading the MiniLM model and creating the first local index are one-time operations on a new machine.
 - **LLM error:** verify the API key, model availability for your account, and network access.
 
 ## Project structure
 
 ```text
-app.py
+app.py                 # FastAPI entrypoint
+api.py                 # JSON API and HTML route
+index.html             # browser frontend
+PRD(4).md
 README.md
-PROMPTS.md
 requirements.txt
 .env.example
 .gitignore

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tesla Financial Report RAG Assistant</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #68766d;
+      --paper: #f5f7f1;
+      --panel: #ffffff;
+      --line: #dbe4db;
+      --accent: #e33d2e;
+      --accent-dark: #ae261d;
+      --soft: #edf3ec;
+      --shadow: 0 18px 50px rgba(31, 54, 39, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    button, textarea { font: inherit; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 280px 1fr; }
+    aside {
+      padding: 28px 22px;
+      color: #edf5ed;
+      background: #1d3126;
+      border-right: 1px solid #304638;
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #a9c4ae;
+      font: 700 11px/1.2 Arial, sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    aside h1 { margin: 0; font-size: 25px; line-height: 1.05; font-weight: 500; }
+    .history-title { margin: 48px 0 14px; font: 700 11px/1.2 Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #a9c4ae; }
+    #history { display: grid; gap: 8px; }
+    .history-item {
+      padding: 10px 11px;
+      color: #dce9dd;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 5px;
+      font: 13px/1.35 Arial, sans-serif;
+    }
+    .empty-history { color: #91aa96; font: 13px/1.45 Arial, sans-serif; }
+    main { max-width: 1000px; width: 100%; margin: 0 auto; padding: 56px 6vw 72px; }
+    .intro { max-width: 700px; margin-bottom: 32px; }
+    .intro h2 { margin: 0 0 12px; font-size: clamp(34px, 5vw, 62px); line-height: 0.98; font-weight: 500; letter-spacing: 0; }
+    .intro p { margin: 0; color: var(--muted); font: 16px/1.55 Arial, sans-serif; }
+    .ask-panel { padding: 22px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    label { display: block; margin-bottom: 10px; font: 700 12px/1.2 Arial, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+    textarea { width: 100%; min-height: 108px; resize: vertical; padding: 15px; color: var(--ink); background: #fbfcf9; border: 1px solid var(--line); border-radius: 4px; outline: none; line-height: 1.45; }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(227,61,46,0.12); }
+    .actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }
+    .hint { color: var(--muted); font: 12px/1.35 Arial, sans-serif; }
+    button { padding: 11px 20px; color: white; background: var(--accent); border: 0; border-radius: 4px; cursor: pointer; font: 700 13px/1 Arial, sans-serif; }
+    button:hover { background: var(--accent-dark); }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    #status { min-height: 20px; margin-top: 14px; color: var(--accent-dark); font: 13px/1.4 Arial, sans-serif; }
+    .section { margin-top: 34px; }
+    .section h3 { margin: 0 0 12px; font-size: 22px; font-weight: 500; }
+    .answer { padding: 21px; color: #243228; background: #e8f0e6; border-left: 4px solid var(--accent); white-space: pre-wrap; font-size: 18px; line-height: 1.55; }
+    details { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); }
+    summary { padding: 14px 16px; cursor: pointer; font: 700 13px/1.3 Arial, sans-serif; }
+    .detail-body { padding: 0 16px 16px; }
+    .expansion { padding: 9px 0; border-bottom: 1px solid var(--line); font: 14px/1.45 Arial, sans-serif; }
+    .expansion:last-child { border-bottom: 0; }
+    .source-meta { margin-bottom: 10px; color: var(--muted); font: 12px/1.3 Arial, sans-serif; }
+    .source-text { margin: 0; white-space: pre-wrap; font: 14px/1.5 Arial, sans-serif; }
+    .hidden { display: none; }
+    @media (max-width: 760px) {
+      .shell { display: block; }
+      aside { padding: 22px; }
+      .history-title { margin-top: 28px; }
+      #history { display: flex; overflow-x: auto; padding-bottom: 4px; }
+      .history-item { min-width: 220px; }
+      main { padding: 38px 20px 54px; }
+      .actions { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <p class="eyebrow">Tesla / 10-K</p>
+      <h1>Financial Report<br>RAG Assistant</h1>
+      <p class="history-title">Question history</p>
+      <div id="history"><p class="empty-history">Questions from this session will appear here.</p></div>
+    </aside>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Evidence-led research</p>
+        <h2>Ask the report a better question.</h2>
+        <p>Search the Tesla financial report with local embeddings, three transparent query expansions, and grounded source context.</p>
+      </section>
+
+      <section class="ask-panel">
+        <form id="ask-form">
+          <label for="question">Your question</label>
+          <textarea id="question" name="question" placeholder="What was Tesla's total revenue?" required></textarea>
+          <div class="actions">
+            <span class="hint">Answers use the supplied Tesla report as the primary source.</span>
+            <button id="ask-button" type="submit">Ask the report</button>
+          </div>
+          <div id="status" role="status"></div>
+        </form>
+      </section>
+
+      <section id="results" class="hidden">
+        <div class="section">
+          <h3>Query expansion & retrieval trace</h3>
+          <details open>
+            <summary id="original-question">Original question</summary>
+            <div class="detail-body" id="expansions"></div>
+          </details>
+        </div>
+
+        <div class="section">
+          <h3>Answer</h3>
+          <div id="answer" class="answer"></div>
+        </div>
+
+        <div class="section">
+          <h3>Retrieved context</h3>
+          <div id="sources"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const form = document.getElementById("ask-form");
+    const questionInput = document.getElementById("question");
+    const askButton = document.getElementById("ask-button");
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+    const history = document.getElementById("history");
+    const sessionQuestions = [];
+
+    function renderHistory() {
+      history.innerHTML = "";
+      if (!sessionQuestions.length) {
+        history.innerHTML = '<p class="empty-history">Questions from this session will appear here.</p>';
+        return;
+      }
+      sessionQuestions.forEach((question) => {
+        const item = document.createElement("div");
+        item.className = "history-item";
+        item.textContent = question;
+        history.appendChild(item);
+      });
+    }
+
+    function renderResult(data) {
+      results.classList.remove("hidden");
+      document.getElementById("original-question").textContent = `Original: ${data.question}`;
+      document.getElementById("answer").textContent = data.answer;
+
+      const expansions = document.getElementById("expansions");
+      expansions.innerHTML = "";
+      data.expansions.forEach((expansion, index) => {
+        const item = document.createElement("div");
+        item.className = "expansion";
+        item.textContent = `${index + 1}. ${expansion}`;
+        expansions.appendChild(item);
+      });
+
+      const sources = document.getElementById("sources");
+      sources.innerHTML = "";
+      if (!data.sources.length) {
+        sources.innerHTML = "<p>No relevant report context was found.</p>";
+        return;
+      }
+      data.sources.forEach((source, index) => {
+        const details = document.createElement("details");
+        const page = source.page == null ? "Page unavailable" : `Page ${source.page}`;
+        details.innerHTML = `<summary>Source ${index + 1} — ${page}</summary><div class="detail-body"><p class="source-meta"></p><p class="source-text"></p></div>`;
+        details.querySelector(".source-meta").textContent = source.document;
+        details.querySelector(".source-text").textContent = source.text;
+        sources.appendChild(details);
+      });
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const question = questionInput.value.trim();
+      if (!question) {
+        status.textContent = "Please enter a question.";
+        return;
+      }
+
+      askButton.disabled = true;
+      status.textContent = "Expanding the question and searching the report...";
+      try {
+        const response = await fetch("/api/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Unable to generate an answer right now.");
+        sessionQuestions.push(question);
+        renderHistory();
+        renderResult(data);
+        status.textContent = "";
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        askButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

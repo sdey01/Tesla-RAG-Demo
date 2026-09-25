@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import streamlit as st
+from functools import lru_cache
+
 from langchain_chroma import Chroma
 
 from src.config import CHROMA_PERSIST_DIRECTORY, COLLECTION_NAME, INDEX_MARKER, PDF_PATH
@@ -12,6 +13,7 @@ class VectorStoreError(RuntimeError):
     """Raised when the local document index cannot be loaded or created."""
 
 
+@lru_cache(maxsize=1)
 def get_vectorstore() -> Chroma:
     try:
         embeddings = get_embeddings()
